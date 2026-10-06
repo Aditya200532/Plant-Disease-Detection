@@ -1,6 +1,7 @@
 import axios from 'axios';
-
-const api = axios.create({ baseURL: '/api' });
+const api = axios.create({
+  baseURL: 'https://plant-disease-detection-cwoo.onrender.com/api',
+});
 
 export const predictImage = (file) => {
   const formData = new FormData();
