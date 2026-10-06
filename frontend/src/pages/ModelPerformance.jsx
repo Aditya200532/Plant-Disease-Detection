@@ -1,92 +1,90 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getModelInfo } from '../services/api';
+
+const visualizations = [
+  { file: 'accuracy_curve.png', label: 'Training accuracy' },
+  { file: 'loss_curve.png', label: 'Training loss' },
+  { file: 'confusion_matrix.png', label: 'Confusion matrix' },
+  { file: 'class_distribution.png', label: 'Class distribution' },
+];
 
 export default function ModelPerformance() {
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getModelInfo().then(r => setInfo(r.data)).catch(() => {}).finally(() => setLoading(false));
+    getModelInfo().then((response) => setInfo(response.data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
-  if (!info) return <p>Could not load model information.</p>;
+  if (!info) return <div className="error-message"><strong>Model information unavailable</strong><span>Confirm that the backend is running.</span></div>;
 
   const metrics = [
-    { label: 'Test Accuracy', value: info.test_accuracy },
+    { label: 'Test accuracy', value: info.test_accuracy },
     { label: 'Precision', value: info.precision_weighted },
     { label: 'Recall', value: info.recall_weighted },
-    { label: 'F1 Score', value: info.f1_weighted },
+    { label: 'F1 score', value: info.f1_weighted },
   ];
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Model Performance</h1>
-        <p>Details about the trained MobileNetV2 model</p>
-      </div>
+      <header className="page-header">
+        <div className="eyebrow"><span /> Transparent evaluation</div>
+        <h1>Model performance</h1>
+        <p>Actual evaluation results from the held-out test set—not estimated or fabricated metrics.</p>
+      </header>
 
-      <div className="grid grid-2">
-        <div className="card">
-          <h3 style={{ marginBottom: 16 }}>Model Details</h3>
+      <section className="grid grid-2">
+        <article className="card">
+          <span className="section-kicker">Architecture</span>
+          <h2 className="panel-title" style={{ marginTop: 7 }}>Model details</h2>
           <table>
             <tbody>
-              <tr><th>Model</th><td>{info.model_name}</td></tr>
-              <tr><th>Architecture</th><td>Transfer Learning (ImageNet)</td></tr>
-              <tr><th>Number of Classes</th><td>{info.number_of_classes}</td></tr>
-              <tr><th>Input Size</th><td>{info.image_size} x {info.image_size} px</td></tr>
+              <tr><th>Base model</th><td><strong>{info.model_name}</strong></td></tr>
+              <tr><th>Method</th><td>ImageNet transfer learning</td></tr>
+              <tr><th>Classes</th><td>{info.number_of_classes}</td></tr>
+              <tr><th>Input shape</th><td>{info.image_size} × {info.image_size} pixels</td></tr>
             </tbody>
           </table>
-        </div>
+        </article>
 
-        <div className="card">
-          <h3 style={{ marginBottom: 16 }}>Evaluation Metrics</h3>
+        <article className="card">
+          <span className="section-kicker">Held-out test set</span>
+          <h2 className="panel-title" style={{ marginTop: 7 }}>Evaluation metrics</h2>
           <div className="grid grid-2">
-            {metrics.map(m => (
-              <div key={m.label} className="stat-card" style={{ background: '#f5f7fa', borderRadius: 8, padding: 16 }}>
-                <h3 style={{ color: 'var(--primary)' }}>
-                  {m.value != null ? `${(m.value * 100).toFixed(1)}%` : '-'}
-                </h3>
-                <p>{m.label}</p>
+            {metrics.map((metric) => (
+              <div key={metric.label} className="metric-tile">
+                <strong>{metric.value != null ? `${(metric.value * 100).toFixed(1)}%` : '—'}</strong>
+                <span>{metric.label}</span>
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </article>
+      </section>
 
-      <div className="card" style={{ marginTop: 20 }}>
-        <h3 style={{ marginBottom: 16 }}>Training &amp; Evaluation Visualizations</h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: 16, fontSize: 14 }}>
-          Generated during model training and evaluation. These images are served from the results directory.
-        </p>
-        <div className="grid grid-2">
-          {['accuracy_curve.png', 'loss_curve.png', 'confusion_matrix.png', 'class_distribution.png'].map(name => (
-            <div key={name} style={{ textAlign: 'center' }}>
-              <p style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>{name.replace(/_/g, ' ').replace('.png', '')}</p>
-              <img
-                src={`/api/results/${name}`}
-                alt={name}
-                style={{ maxWidth: '100%', borderRadius: 8, border: '1px solid var(--border)' }}
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-            </div>
+      <section className="card" style={{ marginTop: 20 }}>
+        <span className="section-kicker">Evidence</span>
+        <h2 className="panel-title" style={{ marginTop: 7 }}>Training and evaluation visuals</h2>
+        <div className="visualization-grid">
+          {visualizations.map((item) => (
+            <figure className="visualization-card" key={item.file}>
+              <p>{item.label}</p>
+              <img src={`/api/results/${item.file}`} alt={item.label} onError={(event) => { event.currentTarget.closest('figure').style.display = 'none'; }} />
+            </figure>
           ))}
         </div>
-      </div>
+      </section>
 
-      <div className="card" style={{ marginTop: 20 }}>
-        <h3 style={{ marginBottom: 16 }}>Class Names</h3>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {info.class_names?.map(name => (
-            <span key={name} className="badge" style={{
-              background: name.toLowerCase().includes('healthy') ? '#e8f5e9' : '#fff3e0',
-              color: name.toLowerCase().includes('healthy') ? '#2e7d32' : '#e65100',
-            }}>
-              {name.replace(/___/g, ' - ').replace(/__/g, ' - ').replace(/_/g, ' ')}
-            </span>
-          ))}
+      <section className="card" style={{ marginTop: 20 }}>
+        <span className="section-kicker">Coverage</span>
+        <h2 className="panel-title" style={{ marginTop: 7 }}>Recognized classes</h2>
+        <div className="class-list">
+          {info.class_names?.map((name) => {
+            const healthy = name.toLowerCase().includes('healthy');
+            return <span key={name} className={`badge ${healthy ? 'badge-healthy' : 'badge-diseased'}`}><i /> {name.replace(/___/g, ' · ').replace(/__/g, ' · ').replace(/_/g, ' ')}</span>;
+          })}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getDiseaseInfo } from '../services/api';
 
 export default function DiseaseInfo() {
@@ -6,39 +6,41 @@ export default function DiseaseInfo() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getDiseaseInfo().then(r => setDiseases(r.data)).catch(() => {}).finally(() => setLoading(false));
+    getDiseaseInfo().then((response) => setDiseases(response.data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
-  if (!diseases) return <p>Could not load disease information.</p>;
+  if (!diseases) return <div className="error-message"><strong>Disease library unavailable</strong><span>Confirm that the backend is running.</span></div>;
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Disease Information</h1>
-        <p>General educational information about plant diseases detected by the model</p>
-      </div>
+      <header className="page-header page-header-split">
+        <div>
+          <div className="eyebrow"><span /> Educational resource</div>
+          <h1>Disease library</h1>
+          <p>Understand common visual symptoms and general prevention practices.</p>
+        </div>
+        <div className="security-note">
+          <span>i</span>
+          <div><strong>General guidance</strong><small>Not a chemical treatment recommendation</small></div>
+        </div>
+      </header>
 
-      <div className="grid grid-2">
-        {Object.entries(diseases).map(([name, info]) => (
-          <div key={name} className="card">
-            <h3 style={{ marginBottom: 8 }}>
-              <span className={`badge ${name === 'Healthy' ? 'badge-healthy' : 'badge-diseased'}`} style={{ marginRight: 8 }}>
-                {name === 'Healthy' ? 'Healthy' : 'Disease'}
-              </span>
-              {name}
-            </h3>
-            <p style={{ fontSize: 14, marginBottom: 12 }}>{info.description}</p>
-            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-              <strong>Prevention:</strong> {info.prevention}
-            </p>
-          </div>
-        ))}
-      </div>
+      <section className="grid grid-2">
+        {Object.entries(diseases).map(([name, info]) => {
+          const healthy = name === 'Healthy';
+          return (
+            <article key={name} className="card disease-card">
+              <h3><span className={`badge ${healthy ? 'badge-healthy' : 'badge-diseased'}`}><i /> {healthy ? 'Healthy' : 'Disease'}</span>{name}</h3>
+              <p>{info.description}</p>
+              <p className="prevention"><strong>General prevention:</strong> {info.prevention}</p>
+            </article>
+          );
+        })}
+      </section>
 
       <div className="disclaimer" style={{ marginTop: 20 }}>
-        This information is for general educational purposes only. Do not use it as a substitute for professional agricultural advice.
-        Do not apply specific pesticides or chemical treatments based solely on this information.
+        This content is for education only. Consult an agricultural professional before deciding on treatment, pesticide, or dosage.
       </div>
     </div>
   );

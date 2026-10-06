@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { getHistory } from '../services/api';
 
 export default function History() {
@@ -6,52 +7,49 @@ export default function History() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getHistory().then(r => setHistory(r.data)).catch(() => {}).finally(() => setLoading(false));
+    getHistory().then((response) => setHistory(response.data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Prediction History</h1>
-        <p>Recent predictions stored in the database</p>
-      </div>
+      <header className="page-header page-header-split">
+        <div>
+          <div className="eyebrow"><span /> Saved activity</div>
+          <h1>Prediction history</h1>
+          <p>Review recent plant health analyses stored in MongoDB.</p>
+        </div>
+        <Link to="/predict" className="btn btn-primary">New diagnosis <span>→</span></Link>
+      </header>
 
-      <div className="card" style={{ overflowX: 'auto' }}>
+      <section className="card table-card">
         {history.length === 0 ? (
-          <p style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
-            No predictions yet. Upload an image to get started.
-          </p>
+          <div className="empty-state">
+            <div className="empty-state-icon">AI</div>
+            <h3>Your history is empty</h3>
+            <p>Complete your first leaf diagnosis to start building a searchable prediction record.</p>
+            <Link to="/predict" className="btn btn-primary">Analyze a leaf</Link>
+          </div>
         ) : (
           <table>
             <thead>
-              <tr>
-                <th>Date</th>
-                <th>Plant</th>
-                <th>Disease</th>
-                <th>Status</th>
-                <th>Confidence</th>
-              </tr>
+              <tr><th>Date</th><th>Plant</th><th>Disease</th><th>Status</th><th>Confidence</th></tr>
             </thead>
             <tbody>
-              {history.map((item, i) => (
-                <tr key={i}>
-                  <td>{item.timestamp ? new Date(item.timestamp).toLocaleString() : '-'}</td>
-                  <td>{item.plant}</td>
+              {history.map((item, index) => (
+                <tr key={`${item.timestamp}-${index}`}>
+                  <td>{item.timestamp ? new Date(item.timestamp).toLocaleString() : '—'}</td>
+                  <td><strong>{item.plant}</strong></td>
                   <td>{item.disease}</td>
-                  <td>
-                    <span className={`badge ${item.status === 'Healthy' ? 'badge-healthy' : 'badge-diseased'}`}>
-                      {item.status}
-                    </span>
-                  </td>
-                  <td>{(item.confidence * 100).toFixed(1)}%</td>
+                  <td><span className={`badge ${item.status === 'Healthy' ? 'badge-healthy' : 'badge-diseased'}`}><i /> {item.status}</span></td>
+                  <td><strong>{(item.confidence * 100).toFixed(1)}%</strong></td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
-      </div>
+      </section>
     </div>
   );
 }

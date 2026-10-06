@@ -1,86 +1,94 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getStats } from '../services/api';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-const COLORS = ['#4caf50', '#f44336'];
+const COLORS = ['#65a85c', '#b84b45'];
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getStats().then(r => setStats(r.data)).catch(() => {}).finally(() => setLoading(false));
+    getStats().then((response) => setStats(response.data)).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <div className="loading"><div className="spinner" /></div>;
-  if (!stats) return <p>Could not load statistics.</p>;
+  if (!stats) return <div className="error-message"><strong>Dashboard unavailable</strong><span>Confirm that the backend is running.</span></div>;
 
   const pieData = [
     { name: 'Healthy', value: stats.healthy },
     { name: 'Diseased', value: stats.diseased },
-  ].filter(d => d.value > 0);
+  ].filter((item) => item.value > 0);
+
+  const summary = [
+    { value: stats.total, label: 'Total scans' },
+    { value: stats.healthy, label: 'Healthy results' },
+    { value: stats.diseased, label: 'Disease results' },
+    { value: stats.top_diseases?.[0]?.disease || '—', label: 'Most detected' },
+  ];
 
   return (
     <div>
-      <div className="page-header">
-        <h1>Dashboard</h1>
-        <p>Prediction statistics overview</p>
-      </div>
+      <header className="page-header page-header-split">
+        <div>
+          <div className="eyebrow"><span /> Live overview</div>
+          <h1>Health dashboard</h1>
+          <p>Track prediction activity and the conditions identified most often.</p>
+        </div>
+        <span className={`badge ${stats.db_available ? 'badge-healthy' : 'badge-diseased'}`}>
+          <i /> {stats.db_available ? 'Database connected' : 'Database offline'}
+        </span>
+      </header>
 
       {!stats.db_available && (
         <div className="disclaimer" style={{ marginBottom: 20 }}>
-          MongoDB is not connected. Statistics will appear once the database is available and predictions are made.
+          MongoDB is not connected. Statistics will populate when the database is available and new predictions are made.
         </div>
       )}
 
-      <div className="grid grid-4">
-        <div className="card stat-card">
-          <h3>{stats.total}</h3>
-          <p>Total Predictions</p>
-        </div>
-        <div className="card stat-card">
-          <h3 style={{ color: '#4caf50' }}>{stats.healthy}</h3>
-          <p>Healthy</p>
-        </div>
-        <div className="card stat-card">
-          <h3 style={{ color: '#f44336' }}>{stats.diseased}</h3>
-          <p>Diseased</p>
-        </div>
-        <div className="card stat-card">
-          <h3>{stats.top_diseases?.[0]?.disease || '-'}</h3>
-          <p>Most Detected</p>
-        </div>
-      </div>
+      <section className="grid grid-4">
+        {summary.map((item) => (
+          <article className="card stat-card" key={item.label}>
+            <h3>{item.value}</h3>
+            <p>{item.label}</p>
+          </article>
+        ))}
+      </section>
 
-      <div className="grid grid-2" style={{ marginTop: 20 }}>
-        {pieData.length > 0 && (
-          <div className="card">
-            <h3 style={{ marginBottom: 16 }}>Healthy vs Diseased</h3>
+      {stats.total === 0 ? (
+        <section className="card empty-state" style={{ marginTop: 20 }}>
+          <div className="empty-state-icon">00</div>
+          <h3>No prediction data yet</h3>
+          <p>Once MongoDB is connected, every completed leaf analysis will contribute to these charts.</p>
+        </section>
+      ) : (
+        <section className="grid grid-2" style={{ marginTop: 20 }}>
+          <article className="card chart-card">
+            <h2 className="panel-title">Plant health split</h2>
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                  {pieData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={62} outerRadius={98} paddingAngle={4} dataKey="value">
+                  {pieData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                 </Pie>
                 <Tooltip />
               </PieChart>
             </ResponsiveContainer>
-          </div>
-        )}
+          </article>
 
-        {stats.top_diseases?.length > 0 && (
-          <div className="card">
-            <h3 style={{ marginBottom: 16 }}>Top Detected Diseases</h3>
+          <article className="card chart-card">
+            <h2 className="panel-title">Top detected diseases</h2>
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={stats.top_diseases}>
-                <XAxis dataKey="disease" tick={{ fontSize: 11 }} />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="count" fill="#f44336" radius={[4, 4, 0, 0]} />
+              <BarChart data={stats.top_diseases} margin={{ left: 0, right: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8df" />
+                <XAxis dataKey="disease" tick={{ fontSize: 10, fill: '#66746d' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#66746d' }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: '#f1f5ec' }} />
+                <Bar dataKey="count" fill="#216548" radius={[7, 7, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-        )}
-      </div>
+          </article>
+        </section>
+      )}
     </div>
   );
 }
