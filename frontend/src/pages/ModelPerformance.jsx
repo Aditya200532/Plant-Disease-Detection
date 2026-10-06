@@ -69,7 +69,13 @@ export default function ModelPerformance() {
           {visualizations.map((item) => (
             <figure className="visualization-card" key={item.file}>
               <p>{item.label}</p>
-              <img src={`/api/results/${item.file}`} alt={item.label} onError={(event) => { event.currentTarget.closest('figure').style.display = 'none'; }} />
+             <img
+  src={`https://plant-disease-detection-cwoo.onrender.com/api/results/${item.file}`}
+  alt={item.label}
+  onError={(event) => {
+    event.currentTarget.closest('figure').style.display = 'none';
+  }}
+/>
             </figure>
           ))}
         </div>
