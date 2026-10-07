@@ -2,8 +2,15 @@
 __pycache__/
 *.py[cod]
 PlantVillage/
-artifacts/
-results/
+artifacts/*
+!artifacts/plant_disease_model.keras
+!artifacts/metadata.json
+results/*
+!results/metrics.json
+!results/accuracy_curve.png
+!results/loss_curve.png
+!results/confusion_matrix.png
+!results/class_distribution.png
 .env
 node_modules/
 frontend/dist/

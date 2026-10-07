@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getModelInfo } from '../services/api';
+import { getModelInfo, getResultUrl } from '../services/api';
 
 const visualizations = [
   { file: 'accuracy_curve.png', label: 'Training accuracy' },
@@ -69,13 +69,13 @@ export default function ModelPerformance() {
           {visualizations.map((item) => (
             <figure className="visualization-card" key={item.file}>
               <p>{item.label}</p>
-             <img
-  src={`https://plant-disease-detection-cwoo.onrender.com/api/results/${item.file}`}
-  alt={item.label}
-  onError={(event) => {
-    event.currentTarget.closest('figure').style.display = 'none';
-  }}
-/>
+              <img
+                src={getResultUrl(item.file)}
+                alt={item.label}
+                onError={(event) => {
+                  event.currentTarget.closest('figure').style.display = 'none';
+                }}
+              />
             </figure>
           ))}
         </div>

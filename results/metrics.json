@@ -1,0 +1,8 @@
+{
+  "test_loss": 0.32426899671554565,
+  "test_accuracy": 0.896751366999035,
+  "precision_weighted": 0.9004242836664121,
+  "recall_weighted": 0.896751366999035,
+  "f1_weighted": 0.8940674832542583,
+  "test_images": 3109
+}
