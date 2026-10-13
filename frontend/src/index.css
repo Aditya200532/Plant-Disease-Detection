@@ -214,6 +214,12 @@ h1, h2, h3 { font-family: 'Manrope', sans-serif; line-height: 1.15; }
 .confidence-track span { display: block; height: 100%; background: linear-gradient(90deg, var(--leaf-400), var(--forest-700)); border-radius: inherit; transition: width .8s ease; }
 .confidence-card small { color: #849087; font-size: 10px; }
 .warning-message { margin-top: 12px; padding: 12px; color: var(--warning); background: var(--warning-soft); border-radius: 10px; font-size: 12px; }
+.badge-unknown { color: var(--warning); background: var(--warning-soft); }
+.top-predictions { margin-top: 14px; padding: 14px 17px; background: rgba(255,255,255,.68); border: 1px solid rgba(23,74,54,.08); border-radius: 14px; }
+.top-predictions > strong { display: block; margin-bottom: 8px; font-size: 12px; }
+.top-predictions ul { margin: 0; padding: 0; }
+.top-predictions li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; color: var(--muted); font-size: 12px; list-style: none; }
+.top-predictions li b { color: var(--forest-800); }
 .gradcam-card { margin-top: 17px; overflow: hidden; background: white; border: 1px solid var(--line); border-radius: 14px; }
 .gradcam-card > div { display: flex; flex-direction: column; padding: 13px 15px; }
 .gradcam-card strong { font-size: 12px; }

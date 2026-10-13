@@ -65,6 +65,7 @@ export default function Predict() {
   };
 
   const confidence = result ? Math.round(result.confidence * 1000) / 10 : 0;
+  const badgeClass = { Healthy: 'badge-healthy', Unrecognized: 'badge-unknown' }[result?.status] || 'badge-diseased';
 
   return (
     <div className="predict-page">
@@ -136,6 +137,7 @@ export default function Predict() {
           <div className="photo-tips">
             <strong>For the best result</strong>
             <div><span>Natural light</span><span>Leaf in focus</span><span>Plain background</span></div>
+            <small>Supported plants: Pepper (bell), Potato, Tomato</small>
           </div>
         </section>
 
@@ -154,7 +156,7 @@ export default function Predict() {
                   <span className="section-kicker">Analysis complete</span>
                   <h2>Prediction result</h2>
                 </div>
-                <span className={`badge ${result.status === 'Healthy' ? 'badge-healthy' : 'badge-diseased'}`}>
+                <span className={`badge ${badgeClass}`}>
                   <i /> {result.status}
                 </span>
               </div>
@@ -172,7 +174,21 @@ export default function Predict() {
 
               {result.warning && <div className="warning-message">{result.warning}</div>}
 
-              {result.gradcam && (
+              {result.top_predictions?.length > 0 && (
+                <div className="top-predictions">
+                  <strong>{result.status === 'Unrecognized' ? 'Closest trained classes' : 'Top predictions'}</strong>
+                  <ul>
+                    {result.top_predictions.map((item) => (
+                      <li key={`${item.plant}-${item.disease}`}>
+                        <span>{item.plant} · {item.disease}</span>
+                        <b>{(item.confidence * 100).toFixed(1)}%</b>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result.gradcam && result.status !== 'Unrecognized' && (
                 <div className="gradcam-card">
                   <div><strong>Visual explanation</strong><span>Highlighted areas influenced the prediction</span></div>
                   <img src={`data:image/png;base64,${result.gradcam}`} alt="Grad-CAM model attention visualization" />

@@ -6,6 +6,9 @@ from pathlib import Path
 
 
 class Predictor:
+    UNKNOWN_CONFIDENCE = 0.6
+    UNKNOWN_MARGIN = 0.2
+
     def __init__(self, model_path: str, metadata: dict):
         import tensorflow as tf
         self.model = tf.keras.models.load_model(model_path)
@@ -24,10 +27,21 @@ class Predictor:
         image_array = self.preprocess(image_bytes)
         input_batch = np.expand_dims(image_array, axis=0).astype(np.float32)
         probabilities = self.model.predict(input_batch, verbose=0)[0]
-        predicted_index = int(np.argmax(probabilities))
+        ranked = np.argsort(probabilities)[::-1]
+        predicted_index = int(ranked[0])
         confidence = float(probabilities[predicted_index])
+        margin = confidence - float(probabilities[ranked[1]])
         class_name = self.class_names[predicted_index]
         plant, disease, status = self._parse_class_name(class_name)
+
+        top_predictions = []
+        for index in ranked[:3]:
+            top_plant, top_disease, _ = self._parse_class_name(self.class_names[int(index)])
+            top_predictions.append({
+                "plant": top_plant,
+                "disease": top_disease,
+                "confidence": round(float(probabilities[int(index)]), 4),
+            })
 
         result = {
             "plant": plant,
@@ -36,15 +50,32 @@ class Predictor:
             "confidence": round(confidence, 4),
             "class_name": class_name,
             "predicted_index": predicted_index,
+            "top_predictions": top_predictions,
+            "supported_plants": self.supported_plants(),
         }
 
-        if confidence < 0.5:
+        # Softmax always picks one of the trained classes, so weak or ambiguous scores mean "not a known leaf".
+        if confidence < self.UNKNOWN_CONFIDENCE or margin < self.UNKNOWN_MARGIN:
+            result.update({
+                "plant": "Unrecognized",
+                "disease": "Not in trained classes",
+                "status": "Unrecognized",
+                "warning": (
+                    "This leaf does not closely match any plant or disease the model was trained on. "
+                    "The model supports only: " + ", ".join(self.supported_plants()) + ". "
+                    "If this is one of those plants, try a clearer, well-lit photo of a single leaf."
+                ),
+            })
+        elif confidence < 0.8:
             result["warning"] = (
-                "Prediction confidence is relatively low. "
-                "Please upload a clearer image of the leaf."
+                "Prediction confidence is moderate. "
+                "Please verify with a clearer image of the leaf."
             )
 
         return result, image_array
+
+    def supported_plants(self) -> list[str]:
+        return sorted({self._parse_class_name(name)[0] for name in self.class_names})
 
     def predict_with_gradcam(self, image_bytes: bytes) -> dict:
         result, image_array = self.predict(image_bytes)
@@ -66,7 +97,7 @@ class Predictor:
         for sep in separators:
             if sep in class_name:
                 parts = class_name.split(sep, 1)
-                plant = parts[0].replace("_", " ").strip()
+                plant = " ".join(parts[0].replace("_", " ").split())
                 disease = parts[1].replace("_", " ").strip()
                 break
         else:

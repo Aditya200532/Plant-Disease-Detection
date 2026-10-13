@@ -42,7 +42,7 @@ export default function History() {
                   <td>{item.timestamp ? new Date(item.timestamp).toLocaleString() : '—'}</td>
                   <td><strong>{item.plant}</strong></td>
                   <td>{item.disease}</td>
-                  <td><span className={`badge ${item.status === 'Healthy' ? 'badge-healthy' : 'badge-diseased'}`}><i /> {item.status}</span></td>
+                  <td><span className={`badge ${{ Healthy: 'badge-healthy', Unrecognized: 'badge-unknown' }[item.status] || 'badge-diseased'}`}><i /> {item.status}</span></td>
                   <td><strong>{(item.confidence * 100).toFixed(1)}%</strong></td>
                 </tr>
               ))}
