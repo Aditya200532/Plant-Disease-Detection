@@ -52,6 +52,8 @@ def build_grad_model(model, last_conv_layer_name: str | None = None):
     x = inputs
     conv_output = None
     for layer in model.layers:
+        if isinstance(layer, tf.keras.layers.InputLayer):
+            continue
         if layer is container:
             x, conv_output = inner_grad(x)
         else:

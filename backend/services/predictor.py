@@ -91,10 +91,7 @@ class Predictor:
             result["gradcam"] = gradcam_image
         except Exception as exc:
             LOGGER.exception("Grad-CAM generation failed")
-            import traceback
-            result["gradcam_error"] = f"{type(exc).__name__}: {exc}\n" + "".join(
-                traceback.format_exc().splitlines(keepends=True)[-6:]
-            )
+            result["gradcam_error"] = f"{type(exc).__name__}: {exc}"
         return result
 
     def _get_grad_model(self):
