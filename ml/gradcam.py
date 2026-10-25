@@ -55,6 +55,7 @@ def build_grad_model(model, last_conv_layer_name: str | None = None):
         if isinstance(layer, tf.keras.layers.InputLayer):
             continue
         if layer is container:
+            x = tf.keras.applications.mobilenet_v2.preprocess_input(x)
             x, conv_output = inner_grad(x, training=False)
         elif isinstance(layer, (tf.keras.Sequential, tf.keras.layers.Dropout)):
             x = layer(x, training=False)
