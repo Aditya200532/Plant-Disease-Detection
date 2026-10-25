@@ -6,49 +6,65 @@ import base64
 import numpy as np
 
 
-def generate_gradcam(
-    model,
-    image_array: np.ndarray,
-    predicted_class: int,
-    last_conv_layer_name: str | None = None,
-) -> np.ndarray:
+def find_last_conv_layer_name(model) -> str:
+    import tensorflow as tf
+
+    containers = [layer for layer in model.layers if getattr(layer, "layers", None)]
+    search_order = list(reversed(containers)) + [model]
+    for container in search_order:
+        for sub_layer in reversed(container.layers):
+            if isinstance(sub_layer, tf.keras.layers.Conv2D):
+                return sub_layer.name
+    raise ValueError("No Conv2D layer found in model; cannot build Grad-CAM.")
+
+
+def build_grad_model(model, last_conv_layer_name: str | None = None):
+    """Keras 3 safe Grad-CAM model.
+
+    The trained model nests MobileNetV2 inside an outer Functional graph, so
+    tensors from the inner blueprint cannot be mixed with model.input. Instead
+    the inner model is re-wrapped with the conv output exposed and then called
+    while rebuilding the outer graph, keeping every tensor in one graph.
+    """
     import tensorflow as tf
 
     if last_conv_layer_name is None:
-        for layer in reversed(model.layers):
-            if hasattr(layer, "layers"):
-                for sub_layer in reversed(layer.layers):
-                    if len(sub_layer.output_shape) == 4:
-                        last_conv_layer_name = sub_layer.name
-                        break
-                if last_conv_layer_name:
-                    break
-            elif len(layer.output_shape) == 4:
-                last_conv_layer_name = layer.name
-                break
+        last_conv_layer_name = find_last_conv_layer_name(model)
 
-    base_model = None
+    container = None
     for layer in model.layers:
-        if hasattr(layer, "layers"):
-            try:
-                layer.get_layer(last_conv_layer_name)
-                base_model = layer
-                break
-            except ValueError:
-                continue
+        subs = getattr(layer, "layers", None)
+        if subs and any(sub.name == last_conv_layer_name for sub in subs):
+            container = layer
+            break
 
-    if base_model is not None:
-        conv_output = base_model.get_layer(last_conv_layer_name).output
-        grad_model = tf.keras.Model(
-            inputs=model.input,
-            outputs=[model.output, conv_output],
-        )
-    else:
-        conv_layer = model.get_layer(last_conv_layer_name)
-        grad_model = tf.keras.Model(
-            inputs=model.input,
-            outputs=[model.output, conv_layer.output],
-        )
+    if container is None:
+        conv_output = model.get_layer(last_conv_layer_name).output
+        return tf.keras.Model(model.input, [model.output, conv_output])
+
+    inner = container
+    inner_grad = tf.keras.Model(
+        inputs=inner.input,
+        outputs=[inner.output, inner.get_layer(last_conv_layer_name).output],
+    )
+
+    inputs = tf.keras.Input(shape=tuple(model.input.shape[1:]))
+    x = inputs
+    conv_output = None
+    for layer in model.layers:
+        if layer is container:
+            x, conv_output = inner_grad(x)
+        else:
+            x = layer(x)
+    return tf.keras.Model(inputs, [x, conv_output])
+
+
+def generate_gradcam(
+    grad_model,
+    image_array: np.ndarray,
+    predicted_class: int,
+) -> np.ndarray:
+    import tensorflow as tf
 
     img_tensor = tf.cast(image_array[np.newaxis, ...], tf.float32)
     with tf.GradientTape() as tape:
@@ -69,24 +85,27 @@ def overlay_heatmap(
     heatmap: np.ndarray,
     alpha: float = 0.4,
 ) -> np.ndarray:
-    import cv2
+    from PIL import Image
+    import matplotlib.cm as cm
 
-    heatmap_resized = cv2.resize(heatmap, (original_image.shape[1], original_image.shape[0]))
-    heatmap_uint8 = np.uint8(255 * heatmap_resized)
-    colormap = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
-    colormap = cv2.cvtColor(colormap, cv2.COLOR_BGR2RGB)
-    overlay = np.uint8(original_image * (1 - alpha) + colormap * alpha)
-    return overlay
+    height, width = original_image.shape[:2]
+    resized = Image.fromarray(np.uint8(255 * heatmap)).resize(
+        (width, height), Image.BILINEAR
+    )
+    heat = np.asarray(resized, dtype=np.float32) / 255.0
+    colormap = np.asarray(cm.jet(heat)[..., :3], dtype=np.float32) * 255.0
+    overlay = original_image * (1 - alpha) + colormap * alpha
+    return np.uint8(np.clip(overlay, 0, 255))
 
 
 def gradcam_to_base64(
-    model,
+    grad_model,
     image_array: np.ndarray,
     predicted_class: int,
 ) -> str:
     from PIL import Image
 
-    heatmap = generate_gradcam(model, image_array, predicted_class)
+    heatmap = generate_gradcam(grad_model, image_array, predicted_class)
     overlay = overlay_heatmap(image_array, heatmap)
     img = Image.fromarray(overlay)
     buffer = io.BytesIO()

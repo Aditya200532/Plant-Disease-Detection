@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import numpy as np
 from pathlib import Path
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Predictor:
@@ -15,6 +18,7 @@ class Predictor:
         self.class_names: list[str] = metadata["class_names"]
         self.image_size: int = metadata["image_size"]
         self.num_classes: int = metadata["number_of_classes"]
+        self._grad_model = None
 
     def preprocess(self, image_bytes: bytes) -> np.ndarray:
         import tensorflow as tf
@@ -82,12 +86,19 @@ class Predictor:
         try:
             from ml.gradcam import gradcam_to_base64
             gradcam_image = gradcam_to_base64(
-                self.model, image_array, result["predicted_index"]
+                self._get_grad_model(), image_array, result["predicted_index"]
             )
             result["gradcam"] = gradcam_image
-        except Exception:
-            pass
+        except Exception as exc:
+            LOGGER.exception("Grad-CAM generation failed")
+            result["gradcam_error"] = f"{type(exc).__name__}: {exc}"
         return result
+
+    def _get_grad_model(self):
+        if self._grad_model is None:
+            from ml.gradcam import build_grad_model
+            self._grad_model = build_grad_model(self.model)
+        return self._grad_model
 
     @staticmethod
     def _parse_class_name(class_name: str) -> tuple[str, str, str]:

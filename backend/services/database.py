@@ -41,6 +41,7 @@ class Database:
             "timestamp": datetime.now(timezone.utc),
         }
         doc.pop("gradcam", None)
+        doc.pop("gradcam_error", None)
         result = await self.db.predictions.insert_one(doc)
         return str(result.inserted_id)
 
