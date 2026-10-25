@@ -88,14 +88,16 @@ def overlay_heatmap(
     alpha: float = 0.4,
 ) -> np.ndarray:
     from PIL import Image
-    import matplotlib.cm as cm
 
     height, width = original_image.shape[:2]
     resized = Image.fromarray(np.uint8(255 * heatmap)).resize(
         (width, height), Image.BILINEAR
     )
     heat = np.asarray(resized, dtype=np.float32) / 255.0
-    colormap = np.asarray(cm.jet(heat)[..., :3], dtype=np.float32) * 255.0
+    red = np.clip(1.5 - np.abs(4.0 * heat - 3.0), 0.0, 1.0)
+    green = np.clip(1.5 - np.abs(4.0 * heat - 2.0), 0.0, 1.0)
+    blue = np.clip(1.5 - np.abs(4.0 * heat - 1.0), 0.0, 1.0)
+    colormap = np.stack((red, green, blue), axis=-1) * 255.0
     overlay = original_image * (1 - alpha) + colormap * alpha
     return np.uint8(np.clip(overlay, 0, 255))
 

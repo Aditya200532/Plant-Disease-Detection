@@ -79,7 +79,7 @@ camera and an internet connection.
 | Metrics | **scikit-learn** | `accuracy_score`, `classification_report`, `confusion_matrix` |
 | Plots | **Matplotlib** | Accuracy/loss curves, confusion matrix, EDA charts |
 | Image I/O | **Pillow** | Encode Grad-CAM overlay to PNG → base64 |
-| Image processing | **Pillow + Matplotlib** | Resize heatmap, apply JET colormap, alpha blend |
+| Image processing | **Pillow + NumPy** | Resize heatmap, apply JET colormap, alpha blend |
 
 ### Database
 - **MongoDB** (connected via Motor, URI from the `MONGODB_URI` environment variable).
@@ -564,7 +564,7 @@ and it lets a human catch the model's mistakes.
 7. **ReLU** the result (`tf.maximum(heatmap, 0)`) — keep only regions that *positively* support
    the predicted class; discard negative evidence.
 8. **Normalize** to 0–1 by dividing by the maximum (with a small epsilon to avoid divide-by-zero).
-9. **Overlay:** Pillow resizes the heat map back to the original image size, Matplotlib applies the **JET
+9. **Overlay:** Pillow resizes the heat map back to the original image size, NumPy applies the **JET
    colormap** (blue = low importance → red = high importance), and alpha-blends it over the leaf
    at **40% opacity**.
 10. **Encode** to PNG, then base64, so it travels inside the JSON response — no extra file
