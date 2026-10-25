@@ -61,25 +61,25 @@ def build_grad_model(model, last_conv_layer_name: str | None = None):
     return tf.keras.Model(inputs, [x, conv_output])
 
 
-def generate_gradcam(
+def predict_and_generate_gradcam(
     grad_model,
     image_array: np.ndarray,
-    predicted_class: int,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     import tensorflow as tf
 
-    img_tensor = tf.cast(image_array[np.newaxis, ...], tf.float32)
+    img_tensor = tf.convert_to_tensor(image_array[np.newaxis, ...], dtype=tf.float32)
     with tf.GradientTape() as tape:
         predictions, conv_outputs = grad_model(img_tensor, training=False)
-        loss = predictions[:, predicted_class]
+        predicted_class = tf.argmax(predictions[0], output_type=tf.int32)
+        score = tf.gather(predictions[0], predicted_class)
 
-    grads = tape.gradient(loss, conv_outputs)
+    grads = tape.gradient(score, conv_outputs)
     pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
     conv_outputs = conv_outputs[0]
     heatmap = conv_outputs @ pooled_grads[..., tf.newaxis]
     heatmap = tf.squeeze(heatmap)
     heatmap = tf.maximum(heatmap, 0) / (tf.math.reduce_max(heatmap) + 1e-8)
-    return heatmap.numpy()
+    return predictions[0].numpy(), heatmap.numpy()
 
 
 def overlay_heatmap(
@@ -102,16 +102,15 @@ def overlay_heatmap(
     return np.uint8(np.clip(overlay, 0, 255))
 
 
-def gradcam_to_base64(
+def predict_with_gradcam_to_base64(
     grad_model,
     image_array: np.ndarray,
-    predicted_class: int,
-) -> str:
+) -> tuple[np.ndarray, str]:
     from PIL import Image
 
-    heatmap = generate_gradcam(grad_model, image_array, predicted_class)
+    probabilities, heatmap = predict_and_generate_gradcam(grad_model, image_array)
     overlay = overlay_heatmap(image_array, heatmap)
     img = Image.fromarray(overlay)
     buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+    img.save(buffer, format="PNG", optimize=False)
+    return probabilities, base64.b64encode(buffer.getvalue()).decode("utf-8")

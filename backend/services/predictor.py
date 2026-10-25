@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-import json
 import logging
+import os
+
 import numpy as np
-from pathlib import Path
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTEROP_THREADS", "1")
+os.environ.setdefault("TF_NUM_INTRAOP_THREADS", "1")
 
 LOGGER = logging.getLogger(__name__)
 
@@ -14,11 +18,13 @@ class Predictor:
 
     def __init__(self, model_path: str, metadata: dict):
         import tensorflow as tf
-        self.model = tf.keras.models.load_model(model_path)
+
+        self.model = tf.keras.models.load_model(model_path, compile=False)
         self.class_names: list[str] = metadata["class_names"]
         self.image_size: int = metadata["image_size"]
         self.num_classes: int = metadata["number_of_classes"]
-        self._grad_model = None
+        from ml.gradcam import build_grad_model
+        self._grad_model = build_grad_model(self.model)
 
     def preprocess(self, image_bytes: bytes) -> np.ndarray:
         import tensorflow as tf
@@ -27,10 +33,13 @@ class Predictor:
         image = tf.image.resize(image, (self.image_size, self.image_size), antialias=True)
         return image.numpy()
 
-    def predict(self, image_bytes: bytes) -> dict:
+    def predict(self, image_bytes: bytes) -> tuple[dict, np.ndarray]:
         image_array = self.preprocess(image_bytes)
-        input_batch = np.expand_dims(image_array, axis=0).astype(np.float32)
-        probabilities = self.model.predict(input_batch, verbose=0)[0]
+        input_batch = image_array[np.newaxis, ...].astype(np.float32)
+        probabilities = self.model(input_batch, training=False).numpy()[0]
+        return self._build_result(probabilities), image_array
+
+    def _build_result(self, probabilities: np.ndarray) -> dict:
         ranked = np.argsort(probabilities)[::-1]
         predicted_index = int(ranked[0])
         confidence = float(probabilities[predicted_index])
@@ -58,7 +67,6 @@ class Predictor:
             "supported_plants": self.supported_plants(),
         }
 
-        # Softmax always picks one of the trained classes, so weak or ambiguous scores mean "not a known leaf".
         if confidence < self.UNKNOWN_CONFIDENCE or margin < self.UNKNOWN_MARGIN:
             result.update({
                 "plant": "Unrecognized",
@@ -76,29 +84,27 @@ class Predictor:
                 "Please verify with a clearer image of the leaf."
             )
 
-        return result, image_array
+        return result
 
     def supported_plants(self) -> list[str]:
         return sorted({self._parse_class_name(name)[0] for name in self.class_names})
 
     def predict_with_gradcam(self, image_bytes: bytes) -> dict:
-        result, image_array = self.predict(image_bytes)
+        image_array = self.preprocess(image_bytes)
         try:
-            from ml.gradcam import gradcam_to_base64
-            gradcam_image = gradcam_to_base64(
-                self._get_grad_model(), image_array, result["predicted_index"]
+            from ml.gradcam import predict_with_gradcam_to_base64
+            probabilities, gradcam_image = predict_with_gradcam_to_base64(
+                self._grad_model, image_array
             )
+            result = self._build_result(probabilities)
             result["gradcam"] = gradcam_image
         except Exception as exc:
             LOGGER.exception("Grad-CAM generation failed")
+            input_batch = image_array[np.newaxis, ...].astype(np.float32)
+            probabilities = self.model(input_batch, training=False).numpy()[0]
+            result = self._build_result(probabilities)
             result["gradcam_error"] = f"{type(exc).__name__}: {exc}"
         return result
-
-    def _get_grad_model(self):
-        if self._grad_model is None:
-            from ml.gradcam import build_grad_model
-            self._grad_model = build_grad_model(self.model)
-        return self._grad_model
 
     @staticmethod
     def _parse_class_name(class_name: str) -> tuple[str, str, str]:
